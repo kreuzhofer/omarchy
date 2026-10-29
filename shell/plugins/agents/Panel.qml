@@ -538,7 +538,7 @@ Panel {
       title: resolved,
       percent: expired ? 0 : Number(percent),
       resetAt: expired ? "" : String(resetAt || ""),
-      spanMs: windowSpanFor(resolved, label)
+      spanMs: windowSpanFor(resolved, label, expired ? "" : resetAt)
     }
   }
 
@@ -547,13 +547,28 @@ Panel {
   // Weekly") runs as long as the window it's named for. Only a session reads
   // its length from the label ("Session (5-hour)", "5h window"); anything
   // else, such as a spend limit, has no clock to pace against.
-  function windowSpanFor(title, label) {
+  function windowSpanFor(title, label, resetAt) {
     var part = scopedPart(title)
     var base = part ? part.window : title
     if (base === "Weekly") return 7 * 24 * 3600 * 1000
-    if (base === "Monthly") return 30 * 24 * 3600 * 1000
+    if (base === "Monthly") return monthSpanBefore(resetAt)
     if (base === "Session") return windowSpanMs(label)
     return 0
+  }
+
+  // Every monthly allowance is a billing period that ends at its reset, so it
+  // began the same day a calendar month earlier: 28 days before a 1 March
+  // reset, 31 before a 1 August one. A day the shorter month lacks (31 March
+  // back to February) lands on that month's last day.
+  function monthSpanBefore(resetAt) {
+    var reset = new Date(String(resetAt || ""))
+    if (isNaN(reset.getTime())) return 30 * 24 * 3600 * 1000
+    var start = new Date(reset.getTime())
+    start.setUTCDate(1)
+    start.setUTCMonth(start.getUTCMonth() - 1)
+    var lastDay = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0)).getUTCDate()
+    start.setUTCDate(Math.min(reset.getUTCDate(), lastDay))
+    return reset.getTime() - start.getTime()
   }
 
   // Where an even burn would have the meter right now: the share of the
@@ -2144,7 +2159,11 @@ Panel {
       color: root.urgent
 
       Behavior on width {
-        NumberAnimation { duration: Style.duration(160); easing.type: Easing.OutCubic }
+        NumberAnimation {
+          duration: Style.duration(160)
+          easing.type: Easing.Bezier
+          easing.bezierCurve: Style.easeOut
+        }
       }
     }
 
@@ -2157,7 +2176,11 @@ Panel {
       color: meter.alarming ? root.urgent : root.foreground
 
       Behavior on width {
-        NumberAnimation { duration: Style.duration(160); easing.type: Easing.OutCubic }
+        NumberAnimation {
+          duration: Style.duration(160)
+          easing.type: Easing.Bezier
+          easing.bezierCurve: Style.easeOut
+        }
       }
     }
 

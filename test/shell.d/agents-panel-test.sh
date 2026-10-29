@@ -151,4 +151,14 @@ const spend = limitWindows({ limits: [
 ] })[0]
 assertEqual(paceFor(spend), -1, 'a limit with no clock gets no pace')
 assertEqual(paceText(spend), '', 'a limit with no clock gets no pace line')
+
+// A monthly allowance is a billing period ending at its reset: February's is
+// 28 days, so halfway through it the notch sits at half, not at 14 / 30.
+panelRoot.nowMs = Date.UTC(2026, 1, 15)
+const monthly = (resetsAt, title) => limitWindows({ limits: [{ label: 'Monthly allowance', title, percent: 0.5, resetsAt }] })[0]
+assertEqual(monthly('2026-03-01T00:00:00Z').spanMs, 28 * 24 * hour, 'a monthly window runs back to the same day a month earlier')
+assertEqual(monthly('2026-08-01T00:00:00Z').spanMs, 31 * 24 * hour, 'a monthly window counts the days of the month it covers')
+assertEqual(monthly('2026-03-31T00:00:00Z').spanMs, 31 * 24 * hour, 'a reset day the earlier month lacks starts on its last day')
+assertEqual(monthly('2026-08-01T00:00:00Z', 'Pro Monthly').spanMs, 31 * 24 * hour, 'a model-scoped monthly window runs on the same month')
+assertEqual(paceFor(monthly('2026-03-01T00:00:00Z')), 0.5, 'halfway through February is half the monthly window')
 JS
